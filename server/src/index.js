@@ -18,12 +18,15 @@ import { cleanGuestFiles } from './utils/files.js';
 const app = express();
 app.set('trust proxy', 1);
 
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+// Global Middlewares (CORS initialized before Helmet)
 app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173' }));
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(compression());
 app.use(express.json({ limit: '100kb' }));
+
 if (process.env.NODE_ENV !== 'test') app.use(morgan('dev'));
 
+// Local File Uploads Directory Initializer
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 app.use('/uploads', express.static(UPLOAD_DIR, { maxAge: '7d', immutable: true }));
 
@@ -35,6 +38,7 @@ app.use('/api/history', historyRoutes);
 app.use('/api/track', trackRoutes);
 app.use('/api/admin', adminRoutes);
 
+// Error Handling Middlewares
 app.use(notFound);
 app.use(errorHandler);
 
