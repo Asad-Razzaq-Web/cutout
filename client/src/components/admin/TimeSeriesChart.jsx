@@ -13,7 +13,7 @@ function niceStep(raw) {
 const fmtDay = (iso) =>
   new Date(iso + 'T00:00:00Z').toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' });
 
-/** Dependency-free SVG line chart. series: [{ key, label, color }] */
+/** Dependency-free responsive SVG line chart with touch support. series: [{ key, label, color }] */
 export default function TimeSeriesChart({ title, data, series }) {
   const [hover, setHover] = useState(null);
   if (!data?.length) return null;
@@ -27,32 +27,50 @@ export default function TimeSeriesChart({ title, data, series }) {
   const active = hover ?? data.length - 1;
   const point = data[active];
 
-  const onMove = (e) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const px = ((e.clientX - rect.left) / rect.width) * W;
+  // Combined function to cleanly handle mouse and touch inputs uniformly
+  const handlePointer = (clientX, currentTarget) => {
+    const rect = currentTarget.getBoundingClientRect();
+    const px = ((clientX - rect.left) / rect.width) * W;
     const i = Math.round(((px - P.l) / (W - P.l - P.r)) * (data.length - 1));
     setHover(Math.min(data.length - 1, Math.max(0, i)));
+  };
+
+  const onMouseMove = (e) => {
+    handlePointer(e.clientX, e.currentTarget);
+  };
+
+  const onTouchMove = (e) => {
+    if (e.touches.length > 0) {
+      // Prevent screen bouncing when tracking chart values
+      if (e.cancelable) e.preventDefault();
+      handlePointer(e.touches[0].clientX, e.currentTarget);
+    }
   };
 
   const labelIdx = [0, Math.floor((data.length - 1) / 2), data.length - 1];
 
   return (
-    <figure className="panel p-4">
-      <figcaption className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="font-display text-lg font-bold">{title}</h3>
-        <p className="text-xs text-ink-soft dark:text-mist-soft" aria-live="polite">
-          {fmtDay(point.date)}:{' '}
+    <figure className="panel p-4 sm:p-5">
+      {/* Header layout responds gracefully on narrow/mobile viewports */}
+      <figcaption className="flex flex-col gap-1.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
+        <h3 className="font-display text-base font-bold sm:text-lg">{title}</h3>
+        <p className="break-all text-xs font-medium text-ink-soft sm:break-normal dark:text-mist-soft" aria-live="polite">
+          <span className="font-semibold text-ink dark:text-mist">{fmtDay(point.date)}:</span>{' '}
           {series.map((s) => `${s.label} ${point[s.key] || 0}`).join(' · ')}
         </p>
       </figcaption>
 
+      {/* SVG Container with complete interactive surface boundaries */}
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        className="mt-3 h-auto w-full text-ink dark:text-mist"
+        className="mt-3 h-auto w-full select-none text-ink touch-none dark:text-mist"
         role="img"
         aria-label={`${title} chart`}
-        onMouseMove={onMove}
+        onMouseMove={onMouseMove}
         onMouseLeave={() => setHover(null)}
+        onTouchStart={onTouchMove}
+        onTouchMove={onTouchMove}
+        onTouchEnd={() => setHover(null)}
       >
         {[0, 1, 2, 3, 4].map((i) => (
           <g key={i}>
@@ -95,9 +113,10 @@ export default function TimeSeriesChart({ title, data, series }) {
         ))}
       </svg>
 
-      <div className="mt-2 flex flex-wrap gap-4 text-xs">
+      {/* Legends footer spacing wrap */}
+      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs">
         {series.map((s) => (
-          <span key={s.key} className="inline-flex items-center gap-1.5">
+          <span key={s.key} className="inline-flex items-center gap-1.5 font-medium text-ink-soft dark:text-mist-soft">
             <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: s.color }} />
             {s.label}
           </span>

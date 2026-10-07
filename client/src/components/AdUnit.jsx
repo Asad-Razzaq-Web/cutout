@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const CLIENT = import.meta.env.VITE_ADSENSE_CLIENT;
 const SLOT = import.meta.env.VITE_ADSENSE_SLOT;
@@ -13,42 +13,69 @@ function loadAdSense() {
   document.head.appendChild(s);
 }
 
-/**
- * Fixed-size container (300x600) so the ad never shifts the layout (good for CLS).
- * Without VITE_ADSENSE_CLIENT it renders a placeholder; with it, a real AdSense unit.
- */
 export default function AdUnit() {
   const pushed = useRef(false);
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  // Track responsive screen thresholds to swap layouts safely before script push
+  useEffect(() => {
+    const checkMatch = () => setIsDesktop(window.innerWidth >= 640);
+    checkMatch(); // Run on initial mount
+    
+    window.addEventListener('resize', checkMatch);
+    return () => window.removeEventListener('resize', checkMatch);
+  }, []);
 
   useEffect(() => {
+    // Only fire the ad registration push when configuration vars are present
     if (!CLIENT || !SLOT || pushed.current) return;
+    
     loadAdSense();
     try {
       (window.adsbygoogle = window.adsbygoogle || []).push({});
       pushed.current = true;
     } catch {
-      /* ad blocker or script not ready */
+      /* Blocked or script not ready */
     }
   }, []);
 
+  // Compute adaptive layout dimensions based on verified screen breaks
+  const adWidth = 300;
+  const adHeight = isDesktop ? 600 : 250;
+  const containerMinHeight = adHeight + 40; // Safely wraps text label padding heights
+
   return (
-    <div className="panel mx-auto flex w-full max-w-[320px] flex-col overflow-hidden" style={{ minHeight: 640 }}>
-      <p className="px-4 pt-3 text-xs text-ink-soft dark:text-mist-soft">Advertisement</p>
+    <div 
+      className="panel mx-auto flex w-full max-w-[340px] flex-col overflow-hidden transition-all duration-200" 
+      style={{ minHeight: containerMinHeight }}
+    >
+      {/* Label identifier */}
+      <p className="px-4 pt-3 text-xs font-medium tracking-wide text-ink-soft dark:text-mist-soft">
+        Advertisement
+      </p>
+      
+      {/* Centered Ad Slot Frame */}
       <div className="flex flex-1 items-center justify-center p-2">
         {CLIENT && SLOT ? (
           <ins
             className="adsbygoogle"
-            style={{ display: 'inline-block', width: 300, height: 600 }}
+            style={{ display: 'inline-block', width: adWidth, height: adHeight }}
             data-ad-client={CLIENT}
             data-ad-slot={SLOT}
+            // Tells AdSense not to alter sizing behind our backs causing CLS shifts
+            data-full-width-responsive="false" 
           />
         ) : (
           <div
-            className="flex h-[600px] w-[300px] items-center justify-center rounded-xl border-2 border-dashed border-paper-line text-center text-sm text-ink-soft dark:border-night-line dark:text-mist-soft"
+            className="flex items-center justify-center rounded-xl border-2 border-dashed border-paper-line text-center text-xs font-semibold text-ink-soft transition-all dark:border-night-line dark:text-mist-soft"
+            style={{ width: adWidth, height: adHeight }}
             role="img"
-            aria-label="Ad placeholder, 300 by 600"
+            aria-label={`Ad placeholder, ${adWidth} by ${adHeight}`}
           >
-            300 × 600<br />ad slot
+            <div>
+              <p className="font-mono text-sm">{adWidth} × {adHeight}</p>
+              <p className="mt-0.5 opacity-70">ad slot</p>
+            </div>
           </div>
         )}
       </div>
