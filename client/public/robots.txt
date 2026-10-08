@@ -2,4 +2,4 @@ User-agent: *
 Allow: /
 Disallow: /api/
 
-Sitemap: https://cutout-bg.onrender.com//sitemap.xml
+Sitemap: https://cutout-bg.onrender.com/sitemap.xml
