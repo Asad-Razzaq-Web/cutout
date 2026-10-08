@@ -14,13 +14,15 @@ import historyRoutes from './routes/history.routes.js';
 import removeBgRoutes from './routes/removeBg.routes.js';
 import trackRoutes from './routes/track.routes.js';
 import { cleanGuestFiles } from './utils/files.js';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const app = express();
 app.set('trust proxy', 1);
 
 // Global Middlewares (CORS initialized before Helmet)
 app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173' }));
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' }, contentSecurityPolicy: false }));
 app.use(compression());
 app.use(express.json({ limit: '100kb' }));
 
@@ -37,6 +39,17 @@ app.use('/api/remove-bg', removeBgRoutes);
 app.use('/api/history', historyRoutes);
 app.use('/api/track', trackRoutes);
 app.use('/api/admin', adminRoutes);
+
+
+if (process.env.NODE_ENV === 'production') {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const dist = path.join(__dirname, '../../client/dist');
+  app.use(express.static(dist));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) return next();
+    res.sendFile(path.join(dist, 'index.html'));
+  });
+}
 
 // Error Handling Middlewares
 app.use(notFound);
