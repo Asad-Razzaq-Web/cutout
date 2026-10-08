@@ -13,3 +13,20 @@ export const uploadImage = multer({
     cb(err);
   },
 }).single('image');
+
+
+
+/** Two images at once (original + finished PNG) for saving browser-processed results. */
+export const uploadPair = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024, files: 2 },
+  fileFilter(_req, file, cb) {
+    if (ALLOWED.has(file.mimetype)) return cb(null, true);
+    const err = new Error('Only JPG, PNG and WebP images are supported.');
+    err.status = 415;
+    cb(err);
+  },
+}).fields([
+  { name: 'original', maxCount: 1 },
+  { name: 'processed', maxCount: 1 },
+]);
