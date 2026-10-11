@@ -16,6 +16,7 @@ import trackRoutes from './routes/track.routes.js';
 import { cleanGuestFiles } from './utils/files.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import https from 'node:https';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -55,11 +56,24 @@ if (process.env.NODE_ENV === 'production') {
 app.use(notFound);
 app.use(errorHandler);
 
+
 const port = process.env.PORT || 5000;
 connectDB()
   .then(() => {
     app.listen(port, () => console.log(`API listening on :${port}`));
     setInterval(() => cleanGuestFiles().catch(() => {}), 15 * 60 * 1000).unref();
+
+    // Keep the Render free tier awake
+    if (process.env.NODE_ENV === 'production' && process.env.RENDER_EXTERNAL_URL) {
+      setInterval(() => {
+        https
+          .get(`${process.env.RENDER_EXTERNAL_URL}/api/health`, (res) => {
+            console.log(`Self-ping status: ${res.statusCode}`);
+            res.resume();
+          })
+          .on('error', (err) => console.error(`Self-ping failed: ${err.message}`));
+      }, 10 * 60 * 1000).unref();
+    }
   })
   .catch((err) => {
     console.error('Failed to start:', err.message);
